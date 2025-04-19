@@ -12,9 +12,9 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = https://github.com/J0schu/dotfilemgr
-Issues = https://github.com/J0schu/dotfilemgr/issues
-Changelog = https://github.com/J0schu/dotfilemgr/releases
+Repository = "https://github.com/J0schu/dotfilemgr"
+Issues = "https://github.com/J0schu/dotfilemgr/issues"
+Changelog = "https://github.com/J0schu/dotfilemgr/releases"
 
 [project.scripts]
 dotfilesmgr = "dotfilesmgr:cli"
