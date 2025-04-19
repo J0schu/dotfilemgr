@@ -119,6 +119,8 @@ def main():
         else:
             print(f"{tag} {copied} file(s) updated, {linked} symlink(s) created")
 
+def cli():
+    main()
 
 if __name__ == "__main__":
-    main()
+    cli()
