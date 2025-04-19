@@ -1,0 +1,17 @@
+[settings]
+mirror = "/home/jonas/.dotfile_mirror"
+
+[[files]]
+source = "/home/jonas/dotfiles/dotfiles/kitty"
+destination = "/home/jonas/.config/kitty"
+type = "dir"
+
+[[files]]
+source = "/home/jonas/dotfiles/dotfiles/nvim"
+destination = "/home/jonas/.config/test/nvim"
+type = "dir"
+
+[[files]]
+source = "/home/jonas/dotfiles/dotfiles/.condarc"
+destination = "/home/jonas/.config/test1/.condarc"
+type = "file"
