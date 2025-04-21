@@ -2,24 +2,33 @@
 Simple tool to manage your dotfiles.
 ### Installation
 ```bash
-pip install dotfilesmgr
+pipx install dotfilesmgr
+```
+### Options
+```bash
+  -h, --help           show this help message and exit
+  -c, --config CONFIG  Path to TOML config file
+  -s, --sync           Perform dotfile syncing
+  -l, --list           List synced symlinks
+  -r, --remove         Remove the currently active symlinks
 ```
 ### Configutation
 ```toml
 [settings]
-mirror = "/home/<your_name>/.dotfile_mirror"
+dotfiles_dir = "~/dotfiles"  # optional, used as base for relative sources
 
-[[files]]
-source = "/home/<your_name>/dotfiles/kitty"
-destination = "/home/<your_name>/.config/kitty"
-type = "dir"
+[kitty]
+source = "./kitty"
+destination = "~/.config/kitty"
 
-[[files]]
-source = "/home/<your_name>/dotfiles/.condarc"
-destination = "/home/<your_name>/.condarc"
-type = "file"
+[nvim]
+source = "./nvim/init.lua"
+destination = "~/.config/test/nvim/init.lua"
+
+[custom_script]
+source = "~/scripts/special_config.sh"  # absolute path, ignored dotfiles_dir
+destination = "~/.config/special.sh"
 ```
 #### TODO's
-- better configuration
 - documentation
 - better terminal output
