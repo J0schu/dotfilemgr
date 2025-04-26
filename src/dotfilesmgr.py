@@ -14,7 +14,7 @@ def sha256sum(path):
             h.update(chunk)
     return h.hexdigest()
 
-def sync_file(src_path, dest_path, store_base, log_file=None):
+def sync_file(src_path, dest_path, store_base, log_file=None, do_sync=False):
     src_path = Path(src_path).expanduser().resolve()
     dest_path = Path(dest_path).expanduser()
     rel_path = src_path.name
@@ -28,29 +28,35 @@ def sync_file(src_path, dest_path, store_base, log_file=None):
     copied = linked = False
 
     if needs_update:
-        if store_path.exists():
-            store_path.chmod(0o644)
-        shutil.copy2(src_path, store_path)
-        store_path.chmod(0o444)
-        print(f"{Fore.GREEN}Copied and locked: {src_path} -> {store_path}")
+        if do_sync:
+            if store_path.exists():
+                store_path.chmod(0o644)
+            shutil.copy2(src_path, store_path)
+            store_path.chmod(0o444)
+            print(f"{Fore.GREEN}Copied and locked: {src_path} -> {store_path}")
+        else:
+            print(f"{Fore.YELLOW}[Dry-run] Would copy: {src_path} -> {store_path}")
         copied = True
 
     if needs_link:
-        if dest_path.exists() or dest_path.is_symlink():
-            dest_path.unlink()
-        dest_path.parent.mkdir(parents=True, exist_ok=True)
-        dest_path.symlink_to(store_path)
-        print(f"{Fore.GREEN}Linked: {store_path} -> {dest_path}")
+        if do_sync:
+            if dest_path.exists() or dest_path.is_symlink():
+                dest_path.unlink()
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
+            dest_path.symlink_to(store_path)
+            print(f"{Fore.GREEN}Linked: {store_path} -> {dest_path}")
+        else:
+            print(f"{Fore.YELLOW}[Dry-run] Would link: {store_path} -> {dest_path}")
         linked = True
 
-    # Log the sync details
-    if log_file:
+    # Log the sync details (only if real sync)
+    if log_file and do_sync:
         with open(log_file, 'a') as f:
             f.write(f"Synced: {store_path} -> {dest_path}\n")
 
     return int(copied), int(linked)
 
-def sync_directory(src_dir, dest_dir, store_base, log_file=None):
+def sync_directory(src_dir, dest_dir, store_base, log_file=None, do_sync=False):
     src_dir = Path(src_dir).expanduser().resolve()
     dest_dir = Path(dest_dir).expanduser()
     store_subdir = store_base / src_dir.name
@@ -63,7 +69,7 @@ def sync_directory(src_dir, dest_dir, store_base, log_file=None):
             store_path = store_subdir / relative_path
             dest_path = dest_dir / relative_path
 
-            copied, linked = sync_file(file_path, dest_path, store_path.parent, log_file=log_file)
+            copied, linked = sync_file(file_path, dest_path, store_path.parent, log_file=log_file, do_sync=do_sync)
             copied_count += copied
             linked_count += linked
 
@@ -84,42 +90,62 @@ def load_config(config_path):
 
     dotfiles_root = Path(config.get("settings", {}).get("dotfiles_dir", "")).expanduser().resolve()
     mappings = []
+    config_errors = []
+    missing_sources = []
 
     for program, entry in config.items():
         if program == "settings":
             continue
 
         if not isinstance(entry, dict):
-            print(f"{Fore.RED}Invalid config entry for [{program}] – expected a table.")
+            config_errors.append(f"Invalid config entry for [{program}] – expected a table.")
             continue
 
-        try:
-            raw_source = entry["source"]
-            destination = Path(entry["destination"]).expanduser()
-        except KeyError as e:
-            print(f"{Fore.RED}Missing key '{e.args[0]}' in [{program}] config.")
+        raw_source = entry.get("source")
+        destination = entry.get("destination")
+
+        if raw_source is None:
+            config_errors.append(f"Missing 'source' key in [{program}] config.")
+            continue
+        if destination is None:
+            config_errors.append(f"Missing 'destination' key in [{program}] config.")
             continue
 
         if raw_source.startswith("./"):
             if dotfiles_root:
                 source = (dotfiles_root / raw_source[2:]).resolve()
             else:
-                print(f"{Fore.RED}Relative source '{raw_source}' in [{program}] but no dotfiles_dir defined.")
+                config_errors.append(f"Relative source '{raw_source}' in [{program}] but no dotfiles_dir defined.")
                 continue
         else:
             source = Path(raw_source).expanduser().resolve()
 
         if not source.exists():
-            print(f"{Fore.YELLOW}Source path does not exist yet: {source} (in [{program}])")
+            missing_sources.append(f"[{program}] Missing source path: {source}")
 
         kind = "dir" if source.is_dir() else "file"
 
         mappings.append({
             "program": program,
             "source": source,
-            "destination": destination,
+            "destination": Path(destination).expanduser(),
             "type": kind
         })
+
+    # If any config syntax errors (TOML structure issues)
+    if config_errors:
+        for err in config_errors:
+            print(f"{Fore.RED}{err}")
+        print(f"{Fore.RED}Errors found in config. Please fix them and try again.")
+        exit(1)
+
+    # If any missing sources
+    if missing_sources:
+        print(f"{Fore.RED}Some source paths are missing or invalid:")
+        for msg in missing_sources:
+            print(f"  {Fore.YELLOW}{msg}")
+        print(f"{Fore.RED}Fix the missing sources before running the sync.")
+        exit(1)
 
     return mappings
 
@@ -214,9 +240,9 @@ def main():
         print_group_header(group_name)
 
         if kind == "dir":
-            copied, linked = sync_directory(src, dst, store, log_file=log_file)
+            copied, linked = sync_directory(src, dst, store, log_file=log_file, do_sync=args.sync)
         elif kind == "file":
-            copied, linked = sync_file(src, dst, store / group_name, log_file=log_file)
+            copied, linked = sync_file(src, dst, store / group_name, log_file=log_file, do_sync=args.sync)
         else:
             print(f"{Fore.RED}Unknown type '{kind}' for {src}")
             copied = linked = 0
